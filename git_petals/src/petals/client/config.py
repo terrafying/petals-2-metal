@@ -1,35 +1,64 @@
-import dataclasses
-import os
-from typing import Optional, Sequence, Union
+from dataclasses import dataclass
+from typing import List, Optional
 
-from hivemind import PeerID
+from petals.constants import DTYPE_MAP
 
-from petals.constants import PUBLIC_INITIAL_PEERS
+@dataclass
+class DistributedConfig:
+    """Configuration for distributed model inference."""
 
-_max_retries = os.getenv("PETALS_MAX_RETRIES")
-DEFAULT_MAX_RETRIES = int(_max_retries) if isinstance(_max_retries, str) else None
+    # Model configuration
+    model_name_or_path: str
+    num_blocks: int
+    torch_dtype: str = "float32"
+    quant_type: str = "none"
 
+    # Server configuration
+    initial_peers: List[str] = None
+    num_handlers: int = 8
+    inference_max_length: int = 2048
 
-@dataclasses.dataclass
-class ClientConfig:
-    initial_peers: Sequence[str] = tuple(PUBLIC_INITIAL_PEERS)  # a list of initial peers for hivemind DHT
-    dht_prefix: Optional[str] = None  # a prefix for all dht keys that correspond to this model (default: model name)
-    daemon_startup_timeout: int = 60  # timeout for the libp2p daemon connecting to initial peers
+    # Timeouts
+    request_timeout: float = 30.0
+    session_timeout: float = 300.0
+    step_timeout: float = 60.0
+    health_check_interval: float = 10.0
 
-    show_route: Union[str, bool] = "inference"  # show chosen route through servers. one of [False, "inference", True]
-    allowed_servers: Optional[Sequence[Union[PeerID, str]]] = None  # if defined, send requests only to these servers
-    blocked_servers: Optional[Sequence[Union[PeerID, str]]] = None  # if defined, do not use these servers
-    use_server_to_server: bool = True  # Use direct server-to-server communication
+    # Retry configuration
+    max_retries: int = 3
+    retry_delay: float = 1.0
 
-    connect_timeout: float = 5  # timeout for opening a connection
-    request_timeout: float = 3 * 60  # timeout for forward/backward/inference requests
-    update_period: float = 60  # refresh DHT information once in this many seconds
+    def __post_init__(self):
+        """Validate configuration after initialization."""
+        if self.initial_peers is None:
+            self.initial_peers = []
 
-    max_retries: Optional[int] = DEFAULT_MAX_RETRIES  # max number of retries before an exception (default: inf)
-    min_backoff: float = 1  # after a repeated failure, sleep for this many seconds times 2 ** (num_failures - 1)
-    max_backoff: float = 60  # limit maximal sleep time between retries to this value
-    ban_timeout: float = 15  # when a remote peer fails to respond, prevent routing to that peer for this many seconds
-    active_adapter: Optional[str] = None  # name of active LoRA adapter (usually, Hugging Face repo)
+        if self.num_blocks <= 0:
+            raise ValueError("num_blocks must be positive")
 
-    max_pinged: int = 3  # max servers to ping from each sequence side, per update
-    ping_timeout: float = 2  # max time to wait for pings, per update
+        if self.num_handlers <= 0:
+            raise ValueError("num_handlers must be positive")
+
+        if self.inference_max_length <= 0:
+            raise ValueError("inference_max_length must be positive")
+
+        if self.request_timeout <= 0:
+            raise ValueError("request_timeout must be positive")
+
+        if self.session_timeout <= 0:
+            raise ValueError("session_timeout must be positive")
+
+        if self.step_timeout <= 0:
+            raise ValueError("step_timeout must be positive")
+
+        if self.health_check_interval <= 0:
+            raise ValueError("health_check_interval must be positive")
+
+        if self.max_retries < 0:
+            raise ValueError("max_retries must be non-negative")
+
+        if self.retry_delay <= 0:
+            raise ValueError("retry_delay must be positive")
+
+# For backward compatibility
+ClientConfig = DistributedConfig
