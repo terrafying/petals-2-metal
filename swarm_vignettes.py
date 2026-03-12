@@ -13,22 +13,43 @@ import logging
 import pyglet
 import pyglet.shapes as pyglet_shapes
 import pyglet.graphics
-import random # For randomizing star properties
-import math # For atan2, degrees for tail rotation
-import seaborn as sns
-import matplotlib.pyplot as plt
-import matplotlib.animation as animation
-from matplotlib.animation import FFMpegWriter
-import ray
-from ray import tune
-from ray.tune.schedulers import ASHAScheduler
+import random  # For randomizing star properties
+import math    # For atan2, degrees for tail rotation
 import os
 import tempfile
 from pathlib import Path
 import json
-import psutil
-import pythonosc.udp_client
 import time
+
+# ── Optional heavy dependencies ───────────────────────────────────────────────
+try:
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+    import matplotlib.animation as animation
+    from matplotlib.animation import FFMpegWriter
+    _MATPLOTLIB_AVAILABLE = True
+except ImportError:
+    _MATPLOTLIB_AVAILABLE = False
+
+try:
+    import ray
+    from ray import tune
+    from ray.tune.schedulers import ASHAScheduler
+    _RAY_AVAILABLE = True
+except ImportError:
+    _RAY_AVAILABLE = False
+
+try:
+    import psutil
+    _PSUTIL_AVAILABLE = True
+except ImportError:
+    _PSUTIL_AVAILABLE = False
+
+try:
+    import pythonosc.udp_client as _osc_udp
+    _OSC_AVAILABLE = True
+except ImportError:
+    _OSC_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -934,7 +955,9 @@ async def cross_language_harmony_swarm():
 
 class OSCVisualizationBridge:
     def __init__(self, ip="127.0.0.1", port=8000):
-        self.client = pythonosc.udp_client.SimpleUDPClient(ip, port)
+        if not _OSC_AVAILABLE:
+            raise RuntimeError("python-osc not installed; cannot create OSCVisualizationBridge")
+        self.client = _osc_udp.SimpleUDPClient(ip, port)
         self.last_send_time = 0
         self.send_interval = 1/30  # 30 Hz update rate
         
@@ -1298,7 +1321,9 @@ async def geometric_reflection_game(save_video: bool = True, video_path: Optiona
     # Return the reflection results and final visualization
     return reflection_results, fig
 
-@ray.remote
+_ray_remote = ray.remote if _RAY_AVAILABLE else (lambda cls: cls)
+
+@_ray_remote
 class GeometricReflectionWorker:
     """Ray actor for running geometric reflection games in parallel."""
     def __init__(self, model_name: str = "gpt2"):
@@ -1339,16 +1364,12 @@ class GeometricReflectionWorker:
 
 def run_parallel_reflection_games(num_games: int = 4, output_dir: str = "reflection_games"):
     """Run multiple geometric reflection games in parallel using Ray."""
-    # Initialize Ray
+    if not _RAY_AVAILABLE:
+        raise RuntimeError("ray not installed; cannot run parallel reflection games")
+
     ray.init()
-    
-    # Create output directory
     os.makedirs(output_dir, exist_ok=True)
-    
-    # Create workers
     workers = [GeometricReflectionWorker.remote() for _ in range(num_games)]
-    
-    # Run games in parallel
     futures = []
     for i in range(num_games):
         video_path = os.path.join(output_dir, f"reflection_game_{i}.mp4")
@@ -1358,13 +1379,8 @@ def run_parallel_reflection_games(num_games: int = 4, output_dir: str = "reflect
             video_path=video_path
         )
         futures.append(future)
-    
-    # Get results
     results = ray.get(futures)
-    
-    # Shutdown Ray
     ray.shutdown()
-    
     return results
 
 async def run_vignettes_with_video(output_dir: str = "vignette_videos"):
@@ -1470,10 +1486,23 @@ for i, result in enumerate(results):
     
     return notebook_path
 
+def run_visualization():
+    """
+    Launch the Pyglet pattern-evolution visualization window.
+
+    This is the entry point called by linguistic_topographer.py when
+    --visualize is passed. It runs the Pyglet event loop in the calling thread
+    (which must be the main thread on macOS/Windows).
+    """
+    logging.basicConfig(level=logging.INFO,
+                        format="%(asctime)s  %(name)s  %(levelname)s  %(message)s")
+    asyncio.run(pattern_evolution_swarm())
+
+
 if __name__ == "__main__":
     # Configure logging
-    logging.basicConfig(level=logging.INFO, 
-                       format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    logging.basicConfig(level=logging.INFO,
+                        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     
     # Run the vignettes with video saving
     output_dir = "vignette_videos"
