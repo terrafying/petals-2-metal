@@ -1,5 +1,7 @@
 # Vision: LLM Internal State as High-Dimensional Geometry
 
+**Product in one line:** The clearest way to see an LLM’s hidden state as fluid 3D geometry in the browser — prompt in, trajectory out, token-by-token.
+
 ## Original intent
 
 This repo was conceived to **explore, via high-dimensional geometric visualization, the internal state of an LLM as it interprets and responds to text**. The goal is to make the “thought process” of a language model visible: how representations evolve across layers, how tokens relate in hidden space, and how generation traces a path through that space.

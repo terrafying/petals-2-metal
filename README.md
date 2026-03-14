@@ -1,66 +1,43 @@
-# Petal 2 Metal — LLM internal state as geometry
+# LLM State Viz — See the model think in 3D
 
-This repo explores **high-dimensional geometric visualization of an LLM’s internal state** as it interprets and responds to text: hidden states, layer-by-layer representation, and (where available) attention. The goal is a **fluid, simulation-style visual experience** in the **browser** (WebGL), plus optional desktop (Pyglet) and integration with the Petals distributed LLM stack.
+**One line:** Type a prompt and watch an LLM’s hidden state as a fluid 3D trajectory in the browser. High-dimensional geometry, token-by-token streaming, layer river — all in one place.
 
-See **[VISION.md](VISION.md)** for the full intent, current state, and planned directions.
-
----
-
-## Quick start: browser visualization
-
-The main visualization is a **browser-based WebGL app** backed by a small Python server that can use a real LLM (with hidden states) or mock data.
-
-1. **Install** (from repo root):
-
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-2. **Start the server**:
-
-   ```bash
-   uvicorn viz_server:app --reload --host 0.0.0.0
-   ```
-
-3. **Open** [http://localhost:8000](http://localhost:8000) in a browser.
-
-4. Enter a prompt and click **Run**. The server **streams** token-by-token: the 3D trajectory (point cloud + line) grows in real time as the model generates. Each point is the last-layer hidden state for that token, reduced to 3D (PCA or random projection). Drag to rotate, scroll to zoom.
-
-- **Streaming** (default): one `stream_token` per token so the trajectory grows live. **Layer** slider is for batch mode only.
-- **Batch mode**: send `stream: false` (e.g. from a custom client) to get all layers at once; then use the **Layer** slider or the **Layer river** checkbox to see one layer or all layers as a braid in 3D.
-- **Without** a local LLM: the server uses **mock** trajectory (deterministic from the prompt). Use `stream_mock: true` in the WebSocket payload to force mock when a model is available.
-- **With** `transformers` and `torch`: a small model (default TinyLlama) is loaded on first use for real hidden-state streaming. See **docs/STREAMING_API.md** for the WebSocket protocol.
+See **[VISION.md](VISION.md)** for intent and roadmap.
 
 ---
 
-## Repo layout (high level)
+## Run it (primary)
+
+```bash
+pip install -r requirements.txt
+uvicorn viz_server:app --reload --host 0.0.0.0
+```
+
+Open [http://localhost:8000](http://localhost:8000), enter a prompt, click **Run**. The 3D trajectory (point cloud + line) grows in real time as the model generates. Each point is last-layer hidden state reduced to 3D (PCA or random projection). Drag to rotate, scroll to zoom.
+
+- **Streaming** (default): trajectory grows live. **Layer** slider and **Layer river** (all layers as braid) apply in batch mode (`stream: false`).
+- **No local model:** server uses **mock** trajectory. Use `stream_mock: true` in the WebSocket payload to force mock when a model is available.
+- **With** `transformers` + `torch`: a small model (e.g. TinyLlama) loads on first use. See **docs/STREAMING_API.md** for the WebSocket protocol.
+
+---
+
+## Repo layout
 
 | Path | Purpose |
 |------|--------|
-| **VISION.md** | Intent, current state, and fruitful avenues (token trajectories, layer river, attention, etc.). |
-| **viz_server.py** | FastAPI + WebSocket server: optional LLM, hidden-state extraction, dimension reduction, stream to frontend. |
-| **viz_static/** | Browser frontend: single-page WebGL (Three.js); streaming trajectory (grows token-by-token) and Layer river (all layers as braid). |
-| **docs/STREAMING_API.md** | WebSocket protocol: `prompt`, `stream` / batch, `stream_start` / `stream_token` / `stream_end`, `states`. |
-| **launch_visualizer.py** | Desktop Pyglet launcher (quantum gravity / mandala style). |
-| **visualization_manager.py** | Pyglet + pattern/lattice logic and legacy browser templates. |
-| **pattern_manager.py** | Resonant modes, pattern tensors, security; used by flock/swarm and can drive geometry. |
-| **flock_generator.py** | Uses a **local** transformers model with `output_hidden_states=True`, applies flocking and PatternManager; the existing “LLM state → geometry” path. |
-| **swarm_vignettes.py** | Vignettes, storytelling, Pyglet/matplotlib visuals. |
-| **connect_client.py** / **client.py** | Petals/local client and pattern generation. |
-| **git_petals/** | Petals distributed LLM (submodule). |
+| **viz_server.py** | FastAPI + WebSocket: LLM hidden-state extraction, dimension reduction, stream to frontend. |
+| **viz_static/** | Browser frontend: WebGL (Three.js), streaming trajectory + Layer river. |
+| **VISION.md** | Intent, current state, and roadmap. |
+| **docs/STREAMING_API.md** | WebSocket protocol. |
+| **docs/PLAN_CEO_REVIEW.md** | Focus and cleanup rationale. |
+| *Legacy / optional* | **launch_visualizer.py**, **visualization_manager.py**, **pattern_manager.py**, **flock_generator.py**, **swarm_vignettes.py** — Pyglet, swarm, mandala experiments. **connect_client.py**, **client.py**, **git_petals/** — Petals distributed demo (no hidden-state viz). |
 
 ---
 
-## Other ways to run
+## Optional: other ways to run
 
-- **Desktop (Pyglet)**  
-  ```bash
-  python launch_visualizer.py
-  ```  
-  Quantum gravity / mandala style; see `--help` for options.
-
-- **Petals + local discovery**  
-  See **DEMO_INSTRUCTIONS.md** for running a Petals server and client. Note: the current Petals client API does not expose hidden states for visualization; the browser viz uses a **local** model or mock data.
+- **Desktop (Pyglet)** — `python launch_visualizer.py`. Legacy quantum gravity / mandala style; see `--help`.
+- **Petals distributed demo** — See **DEMO_INSTRUCTIONS.md** for running a Petals server and client. Petals does not expose hidden states; the main browser viz uses a **local** model or mock data.
 
 ---
 

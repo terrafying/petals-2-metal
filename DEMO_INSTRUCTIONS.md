@@ -1,5 +1,7 @@
 # Petals on Apple Silicon: Demonstration Guide
 
+**Optional.** This guide is for the **Petals distributed-inference demo** (server + client, text generation). It does **not** cover the main product — the **browser LLM State Viz** (hidden-state 3D trajectory). For that, run `uvicorn viz_server:app --reload` and open http://localhost:8000. Petals does not expose hidden states to the client.
+
 This guide will walk you through creating a video or animated GIF demonstration of the Enhanced Petals for Apple Silicon project.
 
 ## 🎞️ Capturing Your "Motion"
