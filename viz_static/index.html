@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LLM State — High-dimensional geometry</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0d0d0f;
+      color: #e0e0e0;
+      overflow: hidden;
+    }
+    #canvas-container { position: fixed; inset: 0; }
+    #ui {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      padding: 12px 16px;
+      background: linear-gradient(180deg, rgba(13,13,15,0.95) 0%, transparent 100%);
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    #prompt {
+      flex: 1;
+      min-width: 200px;
+      max-width: 480px;
+      padding: 10px 14px;
+      border: 1px solid #333;
+      border-radius: 8px;
+      background: #1a1a1c;
+      color: #e0e0e0;
+      font-size: 14px;
+    }
+    #prompt:focus { outline: none; border-color: #5c7cfa; }
+    button {
+      padding: 10px 18px;
+      border: none;
+      border-radius: 8px;
+      background: #2d3748;
+      color: #e0e0e0;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    button:hover { background: #3d4a5c; }
+    button.primary { background: #5c7cfa; color: #fff; }
+    button.primary:hover { background: #6c8cff; }
+    #status {
+      font-size: 12px;
+      opacity: 0.8;
+    }
+    #layer-slider-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    #layer-slider { width: 120px; accent-color: #5c7cfa; }
+    #layer-river-wrap { font-size: 12px; }
+    #layer-river-wrap input[type="checkbox"] { margin-right: 4px; }
+    #hint {
+      position: fixed;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 12px;
+      opacity: 0.6;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="canvas-container"></div>
+  <div id="ui">
+    <input id="prompt" type="text" placeholder="Enter a prompt to visualize internal state…" value="The meaning of life is" />
+    <button id="run" class="primary">Run</button>
+    <div id="layer-slider-wrap">
+      <label for="layer-slider">Layer</label>
+      <input id="layer-slider" type="range" min="0" max="0" value="0" />
+    </div>
+    <div id="layer-river-wrap">
+      <label><input type="checkbox" id="layer-river" /> Layer river</label>
+    </div>
+    <span id="status">Idle. Enter prompt and click Run.</span>
+  </div>
+  <div id="hint">Drag to rotate · Scroll to zoom</div>
+  <script src="viz.js"></script>
+</body>
+</html>

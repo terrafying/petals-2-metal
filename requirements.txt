@@ -1,8 +1,10 @@
-petals
 torch>=2.0.0
-transformers>=4.30.0
-numpy>=1.24.0
-ray>=2.7.0
-soundfile>=0.12.1
-scipy>=1.10.0
-librosa>=0.10.0 
+numpy>=1.21.0
+pyglet>=2.0.0
+matplotlib>=3.4.0  # For potential plotting features
+pillow>=8.0.0     # For image processing
+
+# LLM state visualization (browser + WebSocket backend)
+fastapi>=0.100.0
+uvicorn[standard]>=0.22.0
+scikit-learn>=1.2.0  # Optional: PCA for dimension reduction (fallback: random projection)
