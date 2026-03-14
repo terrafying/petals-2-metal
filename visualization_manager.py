@@ -43,26 +43,56 @@ class PatternVisualizer:
         os.makedirs(self.template_dir, exist_ok=True)
         
     def _prepare_pattern_data(self, pattern: torch.Tensor) -> Dict[str, Any]:
-        """Convert pattern tensor to visualization-friendly format."""
+        """Convert pattern tensor to visualization-friendly format with quantum/time-lattice properties."""
         pattern_np = pattern.detach().cpu().numpy()
+        
+        # Extract quantum properties
+        quantum_coherence = float(pattern_np[0]) if len(pattern_np) > 0 else 0.0
+        time_reversal = float(pattern_np[1]) if len(pattern_np) > 1 else 0.0
+        lattice_stability = float(pattern_np[2]) if len(pattern_np) > 2 else 0.0
+        spin_phase = float(pattern_np[3]) if len(pattern_np) > 3 else 0.0
+        evaporation = float(pattern_np[4]) if len(pattern_np) > 4 else 0.0
+        
         return {
             'values': pattern_np.tolist(),
             'stats': {
-                'depth': float(pattern_np[2]) if len(pattern_np) > 2 else 0.0,
-                'complexity': float(pattern_np[1]) if len(pattern_np) > 1 else 0.0,
-                'harmony': float(pattern_np[3]) if len(pattern_np) > 3 else 0.0
+                'quantum_coherence': quantum_coherence,
+                'time_reversal': time_reversal,
+                'lattice_stability': lattice_stability,
+                'spin_phase': spin_phase,
+                'evaporation': evaporation
             },
-            'lattice': self._generate_lattice_grid(pattern_np)
+            'lattice': self._generate_quantum_lattice(pattern_np)
         }
     
-    def _generate_lattice_grid(self, pattern: np.ndarray) -> List[List[bool]]:
-        """Generate E8 lattice representation of pattern."""
+    def _generate_quantum_lattice(self, pattern: np.ndarray) -> List[List[Dict[str, Any]]]:
+        """Generate quantum lattice representation of pattern with time-reversal and spin properties."""
         grid = []
         for i in range(self.config.grid_size):
             row = []
             for j in range(self.config.grid_size):
-                value = pattern[i % len(pattern)]
-                row.append(abs(value) > self.config.pattern_threshold)
+                # Extract quantum properties for this cell
+                idx = (i * self.config.grid_size + j) % len(pattern)
+                value = pattern[idx]
+                
+                # Calculate quantum properties
+                coherence = abs(value) * 0.8 + 0.2  # Normalize to [0.2, 1.0]
+                time_reversal = (np.sin(value) > 0).astype(float)
+                spin = np.angle(complex(value, pattern[(idx + 1) % len(pattern)]))
+                stability = np.exp(-abs(value))  # Higher stability for smaller values
+                evaporation = 1.0 - np.exp(-abs(value) * 0.1)  # Evaporation rate
+                
+                cell_data = {
+                    'active': abs(value) > self.config.pattern_threshold,
+                    'quantum_properties': {
+                        'coherence': float(coherence),
+                        'time_reversal': float(time_reversal),
+                        'spin': float(spin),
+                        'stability': float(stability),
+                        'evaporation': float(evaporation)
+                    }
+                }
+                row.append(cell_data)
             grid.append(row)
         return grid
     
@@ -655,6 +685,463 @@ class VectorDrivenVisualizer:
             current_angle += angle_step_rad / 2 # Slightly alter global angle each iteration
 
         return "\n".join("".join(row) for row in grid)
+
+class QuantumGravityVisualizer:
+    """Visualizes quantum gravity ≠ statistical mechanics using complexity and connectome graphs."""
+    
+    def __init__(self, config: Optional[VisualizationConfig] = None):
+        self.config = config or VisualizationConfig()
+        self.complexity_graph = None
+        self.connectome_matrix = None
+        self.chaos_state = torch.zeros(3)
+        self.quantum_states = []
+        self.statistical_states = []
+        self.spin_states = []  # Track spin states for each quantum entity
+        self.orbital_params = []  # Track orbital parameters
+        self.glsl_shader = None  # Store GLSL shader code
+        self.jitter_matrix = None  # Store Jitter matrix data
+        
+    def update_visualization(self, 
+                           pattern: torch.Tensor,
+                           batch: pyglet.graphics.Batch,
+                           group_foreground: Optional[pyglet.graphics.Group] = None,
+                           group_background: Optional[pyglet.graphics.Group] = None,
+                           window_width: int = 800,
+                           window_height: int = 800):
+        """Update visualization with quantum gravity effects and orbital mechanics."""
+        # Calculate complexity and update quantum states
+        complexity = self._calculate_complexity(pattern)
+        self._create_quantum_states(pattern)
+        self._create_statistical_states(pattern)
+        self._evolve_chaos_state()
+        
+        # Update spin and orbital mechanics
+        self._update_spin_states(pattern)
+        self._update_orbital_mechanics()
+        
+        # Generate GLSL shader code
+        self._generate_glsl_shader()
+        
+        # Update Jitter matrix
+        self._update_jitter_matrix()
+        
+        # Visualize the difference between quantum and statistical states
+        self._visualize_difference(batch, group_foreground, group_background, window_width, window_height)
+    
+    def _calculate_complexity(self, pattern: torch.Tensor) -> torch.Tensor:
+        """Calculates complexity measure from pattern tensor."""
+        # Use fractal dimension-like measure
+        pattern_np = pattern.detach().cpu().numpy()
+        complexity = np.zeros_like(pattern_np)
+        
+        for i in range(len(pattern_np)):
+            # Calculate local complexity using sliding window
+            window_size = min(10, len(pattern_np) - i)
+            if window_size > 0:
+                window = pattern_np[i:i+window_size]
+                complexity[i] = np.std(window) * np.mean(np.abs(np.diff(window)))
+        
+        return torch.from_numpy(complexity)
+    
+    def _generate_complexity_graph(self, complexity: torch.Tensor) -> np.ndarray:
+        """Generates a graph representation of complexity."""
+        # Create adjacency matrix based on complexity correlations
+        n = len(complexity)
+        graph = np.zeros((n, n))
+        
+        for i in range(n):
+            for j in range(n):
+                if i != j:
+                    # Use complexity correlation as edge weight
+                    graph[i,j] = torch.cosine_similarity(
+                        complexity[i].unsqueeze(0),
+                        complexity[j].unsqueeze(0)
+                    ).item()
+        
+        return graph
+    
+    def _update_connectome(self, pattern: torch.Tensor) -> np.ndarray:
+        """Updates the connectome matrix based on pattern."""
+        # Create connectome matrix using pattern correlations
+        pattern_np = pattern.detach().cpu().numpy()
+        n = len(pattern_np)
+        connectome = np.zeros((n, n))
+        
+        for i in range(n):
+            for j in range(n):
+                if i != j:
+                    # Use pattern correlation as connection strength
+                    connectome[i,j] = np.corrcoef(pattern_np[i], pattern_np[j])[0,1]
+        
+        return connectome
+    
+    def _evolve_chaos_state(self):
+        """Evolves the chaos state from 'i' to 'iii'."""
+        if self.chaos_state[0] == 0.0:
+            self.chaos_state = torch.tensor([0.0, 0.0, 1.0])
+        elif self.chaos_state[1] == 0.0:
+            self.chaos_state = torch.tensor([0.0, 1.0, 0.0])
+        elif self.chaos_state[2] == 0.0:
+            self.chaos_state = torch.tensor([1.0, 0.0, 0.0])
+    
+    def _create_quantum_states(self, pattern: torch.Tensor):
+        """Creates quantum states from pattern."""
+        try:
+            # Use pattern to generate quantum-like states
+            pattern_np = pattern.detach().cpu().numpy()
+            self.quantum_states = []
+            
+            for i in range(0, len(pattern_np), 3):
+                try:
+                    if i + 2 < len(pattern_np):
+                        # Ensure we have valid position data
+                        position = pattern_np[i:i+3]
+                        if len(position) < 3:
+                            position = np.pad(position, (0, 3 - len(position)))
+                        
+                        # Calculate momentum using gradient
+                        momentum = np.gradient(position)
+                        if len(momentum) < 3:
+                            momentum = np.pad(momentum, (0, 3 - len(momentum)))
+                        
+                        # Calculate phase using FFT
+                        phase = np.angle(np.fft.fft(position))
+                        if len(phase) < 3:
+                            phase = np.pad(phase, (0, 3 - len(phase)))
+                        
+                        state = {
+                            'position': torch.tensor(position, dtype=torch.float32),
+                            'momentum': torch.tensor(momentum, dtype=torch.float32),
+                            'phase': torch.tensor(phase, dtype=torch.float32)
+                        }
+                        self.quantum_states.append(state)
+                except Exception as e:
+                    logger.error(f"Error creating quantum state at index {i}: {e}")
+                    # Add a default state if creation fails
+                    self.quantum_states.append({
+                        'position': torch.zeros(3, dtype=torch.float32),
+                        'momentum': torch.zeros(3, dtype=torch.float32),
+                        'phase': torch.zeros(3, dtype=torch.float32)
+                    })
+            
+            # Ensure we have at least one state
+            if not self.quantum_states:
+                logger.warning("No quantum states created, adding default state")
+                self.quantum_states.append({
+                    'position': torch.zeros(3, dtype=torch.float32),
+                    'momentum': torch.zeros(3, dtype=torch.float32),
+                    'phase': torch.zeros(3, dtype=torch.float32)
+                })
+                
+        except Exception as e:
+            logger.error(f"Error in quantum state creation: {e}", exc_info=True)
+            # Create a default state if everything fails
+            self.quantum_states = [{
+                'position': torch.zeros(3, dtype=torch.float32),
+                'momentum': torch.zeros(3, dtype=torch.float32),
+                'phase': torch.zeros(3, dtype=torch.float32)
+            }]
+    
+    def _create_statistical_states(self, pattern: torch.Tensor):
+        """Creates statistical mechanics states from pattern."""
+        # Use pattern to generate statistical mechanics-like states
+        pattern_np = pattern.detach().cpu().numpy()
+        self.statistical_states = []
+        
+        for i in range(0, len(pattern_np), 3):
+            if i + 2 < len(pattern_np):
+                state = {
+                    'position': pattern_np[i:i+3],
+                    'velocity': np.gradient(pattern_np[i:i+3]),
+                    'temperature': np.std(pattern_np[i:i+3])
+                }
+                self.statistical_states.append(state)
+    
+    def _visualize_difference(self, batch, group_foreground, group_background, window_width, window_height):
+        """Visualizes the difference between quantum gravity and statistical mechanics."""
+        center_x = window_width / 2
+        center_y = window_height / 2
+        radius = min(window_width, window_height) / 3
+        
+        # Draw quantum gravity side
+        for i, state in enumerate(self.quantum_states):
+            angle = 2 * np.pi * i / len(self.quantum_states)
+            x = center_x + radius * np.cos(angle)
+            y = center_y + radius * np.sin(angle)
+            
+            # Create quantum state visualization
+            quantum_circle = pyglet_shapes.Circle(
+                x=x, y=y, radius=10,
+                color=(100, 200, 255, 200),  # Blue-ish
+                batch=batch,
+                group=group_foreground
+            )
+            self.shapes.append(quantum_circle)
+        
+        # Draw statistical mechanics side
+        for i, state in enumerate(self.statistical_states):
+            angle = 2 * np.pi * i / len(self.statistical_states)
+            x = center_x - radius * np.cos(angle)
+            y = center_y - radius * np.sin(angle)
+            
+            # Create statistical state visualization
+            stat_rect = pyglet_shapes.Rectangle(
+                x=x-10, y=y-10, width=20, height=20,
+                color=(255, 100, 100, 200),  # Red-ish
+                batch=batch,
+                group=group_foreground
+            )
+            self.shapes.append(stat_rect)
+        
+        # Draw chaos state
+        chaos_text = pyglet.text.Label(
+            text=f"Chaos: {self.chaos_state.tolist()}",
+            font_name='Arial',
+            font_size=36,
+            x=center_x,
+            y=center_y,
+            anchor_x='center',
+            anchor_y='center',
+            color=(255, 255, 255, 255),
+            batch=batch,
+            group=group_foreground
+        )
+        self.shapes.append(chaos_text)
+        
+        # Draw connections
+        for i in range(len(self.quantum_states)):
+            for j in range(len(self.statistical_states)):
+                if self.connectome_matrix[i,j] > 0.5:  # Only draw strong connections
+                    q_angle = 2 * np.pi * i / len(self.quantum_states)
+                    s_angle = 2 * np.pi * j / len(self.statistical_states)
+                    
+                    q_x = center_x + radius * np.cos(q_angle)
+                    q_y = center_y + radius * np.sin(q_angle)
+                    s_x = center_x - radius * np.cos(s_angle)
+                    s_y = center_y - radius * np.sin(s_angle)
+                    
+                    connection = pyglet_shapes.Line(
+                        x=q_x, y=q_y,
+                        x2=s_x, y2=s_y,
+                        color=(200, 200, 200, 100),
+                        batch=batch,
+                        group=group_background
+                    )
+                    self.shapes.append(connection)
+
+    def _update_spin_states(self, pattern: torch.Tensor):
+        """Update spin states based on pattern complexity."""
+        if not self.spin_states:
+            # Initialize spin states if empty
+            num_states = len(self.quantum_states)
+            self.spin_states = [{
+                'angular_momentum': torch.zeros(3),
+                'spin_axis': torch.tensor([0.0, 1.0, 0.0]),
+                'spin_rate': np.random.uniform(0.1, 2.0),
+                'precession': np.random.uniform(0.01, 0.1)
+            } for _ in range(num_states)]
+        
+        # Update spin states based on pattern
+        for i, state in enumerate(self.spin_states):
+            # Extract relevant pattern components for spin
+            pattern_slice = pattern[i % len(pattern):(i + 3) % len(pattern)]
+            if len(pattern_slice) < 3:
+                pattern_slice = torch.cat([pattern_slice, torch.zeros(3 - len(pattern_slice))])
+            
+            # Update angular momentum
+            state['angular_momentum'] = pattern_slice[:3]
+            
+            # Update spin axis based on pattern complexity
+            complexity = torch.norm(pattern_slice)
+            state['spin_axis'] = torch.nn.functional.normalize(
+                state['spin_axis'] + complexity * torch.randn(3),
+                dim=0
+            )
+            
+            # Update spin rate and precession
+            state['spin_rate'] *= (1.0 + 0.1 * torch.sin(complexity))
+            state['precession'] *= (1.0 + 0.05 * torch.cos(complexity))
+    
+    def _update_orbital_mechanics(self):
+        """Update orbital parameters for quantum states."""
+        try:
+            if not self.orbital_params:
+                # Initialize orbital parameters if empty
+                num_states = len(self.quantum_states)
+                self.orbital_params = [{
+                    'semi_major_axis': np.random.uniform(1.0, 5.0),
+                    'eccentricity': np.random.uniform(0.0, 0.8),
+                    'inclination': np.random.uniform(0, np.pi/4),
+                    'orbital_period': np.random.uniform(2.0, 10.0),
+                    'phase': np.random.uniform(0, 2*np.pi)
+                } for _ in range(num_states)]
+            
+            # Update orbital parameters based on quantum states
+            for i, params in enumerate(self.orbital_params):
+                if i < len(self.quantum_states):
+                    quantum_state = self.quantum_states[i]
+                    # Convert quantum state position to tensor if it's not already
+                    if isinstance(quantum_state['position'], (list, np.ndarray)):
+                        position_tensor = torch.tensor(quantum_state['position'], dtype=torch.float32)
+                    else:
+                        position_tensor = quantum_state['position']
+                    
+                    # Calculate complexity using position tensor
+                    complexity = torch.norm(position_tensor)
+                    
+                    # Update orbital parameters with error checking
+                    try:
+                        params['semi_major_axis'] *= (1.0 + 0.1 * torch.sin(complexity).item())
+                        params['eccentricity'] = np.clip(
+                            params['eccentricity'] + 0.1 * torch.cos(complexity).item(),
+                            0.0, 0.9
+                        )
+                        params['inclination'] += 0.1 * torch.sin(complexity).item()
+                        params['orbital_period'] *= (1.0 + 0.05 * torch.cos(complexity).item())
+                        params['phase'] += 0.1 * complexity.item()
+                    except Exception as e:
+                        logger.error(f"Error updating orbital parameters for state {i}: {e}")
+                        # Use safe fallback values
+                        params['semi_major_axis'] = 3.0
+                        params['eccentricity'] = 0.5
+                        params['inclination'] = np.pi/8
+                        params['orbital_period'] = 5.0
+                        params['phase'] = 0.0
+                        
+        except Exception as e:
+            logger.error(f"Error in orbital mechanics update: {e}", exc_info=True)
+            # Initialize with safe default values if something goes wrong
+            if not self.orbital_params:
+                self.orbital_params = [{
+                    'semi_major_axis': 3.0,
+                    'eccentricity': 0.5,
+                    'inclination': np.pi/8,
+                    'orbital_period': 5.0,
+                    'phase': 0.0
+                } for _ in range(max(1, len(self.quantum_states)))]
+    
+    def _generate_glsl_shader(self):
+        """Generate GLSL shader code for visualization."""
+        self.glsl_shader = """
+        #version 330 core
+        
+        uniform float time;
+        uniform vec2 resolution;
+        uniform sampler2D quantum_states;
+        uniform sampler2D spin_states;
+        
+        out vec4 fragColor;
+        
+        // Quantum state structure
+        struct QuantumState {
+            vec3 position;
+            vec3 velocity;
+            float energy;
+        };
+        
+        // Spin state structure
+        struct SpinState {
+            vec3 angular_momentum;
+            vec3 spin_axis;
+            float spin_rate;
+            float precession;
+        };
+        
+        // Orbital parameters
+        struct OrbitalParams {
+            float semi_major_axis;
+            float eccentricity;
+            float inclination;
+            float orbital_period;
+            float phase;
+        };
+        
+        // Calculate orbital position
+        vec3 calculate_orbital_position(OrbitalParams params, float time) {
+            float angle = 2.0 * 3.14159 * (time / params.orbital_period + params.phase);
+            float r = params.semi_major_axis * (1.0 - params.eccentricity * params.eccentricity) /
+                     (1.0 + params.eccentricity * cos(angle));
+            
+            vec3 position;
+            position.x = r * cos(angle);
+            position.y = r * sin(angle) * cos(params.inclination);
+            position.z = r * sin(angle) * sin(params.inclination);
+            
+            return position;
+        }
+        
+        // Calculate spin transformation
+        mat3 calculate_spin_matrix(SpinState spin, float time) {
+            float spin_angle = spin.spin_rate * time;
+            float precession_angle = spin.precession * time;
+            
+            mat3 spin_matrix = mat3(
+                cos(spin_angle), -sin(spin_angle), 0.0,
+                sin(spin_angle), cos(spin_angle), 0.0,
+                0.0, 0.0, 1.0
+            );
+            
+            mat3 precession_matrix = mat3(
+                cos(precession_angle), 0.0, -sin(precession_angle),
+                0.0, 1.0, 0.0,
+                sin(precession_angle), 0.0, cos(precession_angle)
+            );
+            
+            return precession_matrix * spin_matrix;
+        }
+        
+        void main() {
+            vec2 uv = gl_FragCoord.xy / resolution;
+            
+            // Sample quantum and spin states
+            QuantumState q_state;
+            SpinState s_state;
+            
+            // Calculate final position with orbital and spin effects
+            vec3 orbital_pos = calculate_orbital_position(orbital_params, time);
+            mat3 spin_matrix = calculate_spin_matrix(s_state, time);
+            vec3 final_pos = spin_matrix * orbital_pos;
+            
+            // Calculate color based on quantum state energy
+            vec3 color = vec3(0.5 + 0.5 * sin(q_state.energy * time),
+                            0.5 + 0.5 * cos(s_state.spin_rate * time),
+                            0.5 + 0.5 * sin(s_state.precession * time));
+            
+            fragColor = vec4(color, 1.0);
+        }
+        """
+    
+    def _update_jitter_matrix(self):
+        """Update Jitter matrix for Max/MSP/Jitter compatibility."""
+        num_states = len(self.quantum_states)
+        matrix_size = int(np.ceil(np.sqrt(num_states)))
+        self.jitter_matrix = np.zeros((matrix_size, matrix_size, 4))
+        
+        for i, state in enumerate(self.quantum_states):
+            row = i // matrix_size
+            col = i % matrix_size
+            
+            # Convert quantum state to RGBA values
+            self.jitter_matrix[row, col, 0] = float(state[0])  # R
+            self.jitter_matrix[row, col, 1] = float(state[1])  # G
+            self.jitter_matrix[row, col, 2] = float(state[2])  # B
+            self.jitter_matrix[row, col, 3] = 1.0  # A
+    
+    def get_glsl_shader(self) -> str:
+        """Get the current GLSL shader code."""
+        return self.glsl_shader
+    
+    def get_jitter_matrix(self) -> np.ndarray:
+        """Get the current Jitter matrix data."""
+        return self.jitter_matrix
+    
+    def get_orbital_data(self) -> List[Dict]:
+        """Get current orbital parameters."""
+        return self.orbital_params
+    
+    def get_spin_data(self) -> List[Dict]:
+        """Get current spin states."""
+        return self.spin_states
 
 # Example Usage (for testing, to be removed or placed in a main block):
 if __name__ == '__main__':

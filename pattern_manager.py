@@ -61,6 +61,13 @@ class ResonantMode:
     phase_coupling: float = 0.2
     temporal_scale: float = 1.0
     
+    # New parameters for reversible time structures
+    time_reversal_threshold: float = 0.5  # Threshold for time reversal
+    quantum_coherence: float = 0.7  # Quantum coherence factor
+    lattice_stability: float = 0.8  # Lattice stability factor
+    spin_phase: float = 0.0  # Spin phase for quantum states
+    evaporation_rate: float = 0.1  # Rate of pattern evaporation
+    
     # Scales for modulation by driving_vector
     freq_mod_scale: float = 0.5 
     amp_mod_scale: float = 0.5
@@ -68,7 +75,7 @@ class ResonantMode:
     time_mod_scale: float = 0.2
     
     def to_tensor(self, embedding_dim: int, dynamic_phase_offset: float = 0.0, driving_vector: Optional[torch.Tensor] = None) -> torch.Tensor:
-        """Convert resonant mode parameters to a structured tensor, modulated by a driving_vector."""
+        """Convert resonant mode parameters to a structured tensor with quantum/time-lattice properties."""
         # Base parameters from self, potentially modulated by driving_vector
         base_freq = self.frequency
         base_amp = self.amplitude
@@ -77,10 +84,7 @@ class ResonantMode:
         current_phase = self.phase + dynamic_phase_offset
 
         if driving_vector is not None and driving_vector.numel() > 0:
-            # Ensure driving_vector has at least 4 elements, or repeat if fewer
             if driving_vector.numel() < 4:
-                # Ensure driving_vector is on the same device as model parameters if applicable
-                # For now, assuming it's a CPU tensor or device handling is managed upstream
                 dv_expanded = driving_vector.repeat((4 // driving_vector.numel()) + 1)
                 dv_final = dv_expanded[:4]
             else:
@@ -105,30 +109,37 @@ class ResonantMode:
         # Create temporal axis based on modulated time scale
         t = torch.linspace(0, 2 * np.pi * base_time_scale, embedding_dim)
         
-        # Apply frequency modulation using modulated frequency and current_phase
-        freq_mod_wave = torch.sin(t * base_freq + current_phase)
+        # Apply quantum lattice structure
+        lattice_phase = self.spin_phase + current_phase
+        quantum_wave = torch.sin(t * base_freq + lattice_phase) * self.quantum_coherence
+        
+        # Apply time reversal based on threshold
+        time_reversal_mask = (torch.sin(t) > self.time_reversal_threshold).float()
+        reversed_time = t * (1 - time_reversal_mask) + (2 * np.pi * base_time_scale - t) * time_reversal_mask
+        
+        # Apply frequency modulation with time reversal
+        freq_mod_wave = torch.sin(reversed_time * base_freq + current_phase)
         base_output_tensor += base_amp * freq_mod_wave
         
-        # Apply harmonic structure using modulated parameters
+        # Apply harmonic structure with quantum coherence
         for h_order in range(1, self.harmonic_order + 1):
-            harmonic_t = t * h_order
-            # Harmonic frequency uses base_freq, phase includes current_phase
+            harmonic_t = reversed_time * h_order
             harmonic_wave = torch.sin(harmonic_t * base_freq + current_phase) 
-            # Modulation wave for harmonics can use base_mod_depth
-            modulation_wave_for_harmonics = torch.sin(harmonic_t * base_mod_depth) 
+            modulation_wave = torch.sin(harmonic_t * base_mod_depth) 
             
-            harmonic_combined = harmonic_wave * modulation_wave_for_harmonics
-            # Amplitude scaling for harmonics uses base_amp
-            base_output_tensor += (base_amp / (h_order + 1)) * harmonic_combined 
+            # Add quantum coherence to harmonics
+            quantum_harmonic = harmonic_wave * modulation_wave * self.quantum_coherence
+            base_output_tensor += (base_amp / (h_order + 1)) * quantum_harmonic
         
-        # Apply phase coupling (original phase_coupling, not current_phase directly here as it's a different effect)
-        # This phase_coupling might need to be re-thought if current_phase already covers all phase aspects.
-        # For now, let's assume self.phase_coupling is a separate modulation component as per original.
-        # It uses self.phase (base phase of the mode) for its wave.
-        phase_coupling_wave = torch.sin(t * self.phase_coupling + self.phase) 
-        base_output_tensor += self.phase_coupling * phase_coupling_wave
+        # Apply phase coupling with lattice stability
+        phase_coupling_wave = torch.sin(reversed_time * self.phase_coupling + self.phase) 
+        base_output_tensor += self.phase_coupling * phase_coupling_wave * self.lattice_stability
         
-        # Normalize and apply decay (self.decay is the base decay rate)
+        # Apply evaporation effect
+        evaporation_factor = torch.exp(-t * self.evaporation_rate)
+        base_output_tensor *= evaporation_factor
+        
+        # Normalize and apply decay
         norm_val = base_output_tensor.norm()
         if norm_val > 1e-6:
             base_output_tensor = base_output_tensor / norm_val

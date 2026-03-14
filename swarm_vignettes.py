@@ -6,7 +6,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from pattern_manager import PatternManager, SecurityConfig, ResonantMode
 from flock_generator import FlockConfig, FlockGenerator, IterationCallback
 from shape_visualizer import ShapeVisualizer
-from visualization_manager import VectorDrivenVisualizer
+from visualization_manager import VectorDrivenVisualizer, QuantumGravityVisualizer
 import numpy as np
 from storyteller import Storyteller
 import logging
@@ -302,14 +302,28 @@ async def pattern_evolution_update_cycle(flock_generator: FlockGenerator,
     logger.info(f"  Processing mantra: {mantra_config['mantra']} (Cycle {generation_cycle_count + 1})")
 
     if hasattr(flock_generator.pattern_manager, 'resonant_modes'):
+        # Initialize resonant modes with quantum/time-lattice properties
         current_resonant_modes = [
             ResonantMode(
-                frequency=np.random.uniform(0.2, 2.5), amplitude=np.random.uniform(0.4, 0.9),
-                phase=np.random.uniform(0, 2 * np.pi), decay=np.random.uniform(0.1, 0.7),
-                temporal_scale=np.random.uniform(0.5, 2.0), modulation_depth=0.4,
-                phase_coupling=0.3, harmonic_order=np.random.randint(1, 4),
-                freq_mod_scale=0.2, amp_mod_scale=0.2, depth_mod_scale=0.2, time_mod_scale=0.1
-            ) for _ in range(1) 
+                frequency=np.random.uniform(0.2, 2.5),
+                amplitude=np.random.uniform(0.4, 0.9),
+                phase=np.random.uniform(0, 2 * np.pi),
+                decay=np.random.uniform(0.1, 0.7),
+                temporal_scale=np.random.uniform(0.5, 2.0),
+                modulation_depth=0.4,
+                phase_coupling=0.3,
+                harmonic_order=np.random.randint(1, 4),
+                # Quantum/time-lattice specific parameters
+                time_reversal_threshold=np.random.uniform(0.3, 0.7),
+                quantum_coherence=np.random.uniform(0.6, 0.9),
+                lattice_stability=np.random.uniform(0.7, 0.95),
+                spin_phase=np.random.uniform(0, 2 * np.pi),
+                evaporation_rate=np.random.uniform(0.05, 0.2),
+                freq_mod_scale=0.2,
+                amp_mod_scale=0.2,
+                depth_mod_scale=0.2,
+                time_mod_scale=0.1
+            ) for _ in range(3)  # Increased number of modes for richer quantum behavior
         ]
         flock_generator.pattern_manager.resonant_modes = current_resonant_modes
     
@@ -319,29 +333,11 @@ async def pattern_evolution_update_cycle(flock_generator: FlockGenerator,
         iteration_callback=log_flock_iteration_state
     )
     current_batch_generated_items.extend(generated_items_tuples)
-
-    if current_batch_generated_items:
-        generated_text, pattern_tensor_candidate = current_batch_generated_items[-1]
-        
-        # --- EntendreGlyph Creation ---
-        if pyglet_window: # Ensure window exists before creating glyphs
-            for keyword in INTRIGUING_KEYWORDS:
-                if keyword in generated_text.lower(): # Case-insensitive check
-                    glyph_x = random.uniform(pyglet_window.width * 0.1, pyglet_window.width * 0.9)
-                    glyph_y = random.uniform(pyglet_window.height * 0.1, pyglet_window.height * 0.9)
-                    new_glyph = EntendreGlyph(
-                        text=keyword,
-                        x=glyph_x, y=glyph_y,
-                        batch=pyglet_batch, group=pyglet_group_glyphs,
-                        window_width=pyglet_window.width, window_height=pyglet_window.height
-                    )
-                    active_glyphs.append(new_glyph)
-                    logger.info(f"Created EntendreGlyph for keyword: '{keyword}' in text.")
-        # --- End EntendreGlyph Creation ---
-
+    
+    # Process generated items and update pattern tensor
+    for generated_text, pattern_tensor_candidate in current_batch_generated_items:
         if not isinstance(pattern_tensor_candidate, torch.Tensor):
             logger.error(f"Pattern is not a tensor ({type(pattern_tensor_candidate)}), using zero tensor.")
-            # Ensure a correctly sized zero tensor if possible
             hidden_size = flock_generator.models[0].model.config.hidden_size if flock_generator.models else 768
             current_pattern_tensor = torch.zeros(hidden_size, device=flock_generator.models[0].device if flock_generator.models else 'cpu')
         else:
@@ -351,14 +347,25 @@ async def pattern_evolution_update_cycle(flock_generator: FlockGenerator,
                not isinstance(current_pattern_tensor, torch.Tensor) or \
                current_pattern_tensor.shape != pattern_tensor_candidate.shape or \
                current_pattern_tensor.device != pattern_tensor_candidate.device:
-                # This is the first-time assignment or a reset due to incompatibility
-                current_pattern_tensor = pattern_tensor_candidate.clone() 
+                current_pattern_tensor = pattern_tensor_candidate.clone()
                 logger.info("Pattern Tensor: Initialized/Reset.")
             else:
-                # Regular update with interpolation
+                # Regular update with interpolation and quantum effects
                 tensor_at_cycle_start = current_pattern_tensor.clone()
                 
-                current_pattern_tensor = (1 - alpha) * current_pattern_tensor + alpha * pattern_tensor_candidate
+                # Apply quantum coherence to the interpolation
+                quantum_factor = np.mean([mode.quantum_coherence for mode in current_resonant_modes])
+                time_reversal_factor = np.mean([mode.time_reversal_threshold for mode in current_resonant_modes])
+                
+                # Blend patterns with quantum effects
+                current_pattern_tensor = (
+                    (1 - alpha) * current_pattern_tensor + 
+                    alpha * pattern_tensor_candidate * quantum_factor
+                )
+                
+                # Apply time reversal effect
+                if np.random.random() < time_reversal_factor:
+                    current_pattern_tensor = torch.flip(current_pattern_tensor, dims=[0])
                 
                 pattern_change_magnitude = torch.norm(current_pattern_tensor - tensor_at_cycle_start).item()
                 logger.info(f"Pattern Tensor Change (L2 Norm): {pattern_change_magnitude:.4f}")
@@ -430,6 +437,7 @@ async def pattern_evolution_swarm():
     flock_gen = FlockGenerator(selected_models, config=flock_config)
     story_tell = Storyteller(flock_gen.pattern_manager)
     vector_vis = VectorDrivenVisualizer(mandala_size=20, concretion_size=20)
+    quantum_vis = QuantumGravityVisualizer()  # Add quantum gravity visualizer
     
     semantic_flow_prompts = [
         {"mantra": "dinosaur", "temporal_scale": 1.0, "frequency": 1.0},
@@ -452,7 +460,7 @@ async def pattern_evolution_swarm():
         pyglet_window = pyglet.window.Window(
             width=800, 
             height=800, 
-            caption='Pattern Evolution (Pyglet)', 
+            caption='Quantum Gravity ≠ Statistical Mechanics', 
             resizable=True,
             vsync=True  # Enable vertical sync
         )
@@ -477,12 +485,20 @@ async def pattern_evolution_swarm():
         device_to_use = flock_gen.models[0].device if flock_gen.models else 'cpu'
         current_pattern_tensor = torch.zeros(hidden_size, device=device_to_use)
         
+        # Initialize both visualizers
         vector_vis.update_geometric_mandala_pyglet(
             current_pattern_tensor, pyglet_batch,
             group_foreground=pyglet_group_foreground,
             group_background=pyglet_group_background,
             window_width=pyglet_window.width, window_height=pyglet_window.height,
             mandala_shape_bias=flock_gen.config.mandala_shape_bias
+        )
+        
+        quantum_vis.update_visualization(
+            current_pattern_tensor, pyglet_batch,
+            group_foreground=pyglet_group_foreground,
+            group_background=pyglet_group_background,
+            window_width=pyglet_window.width, window_height=pyglet_window.height
         )
 
         if pyglet_window and pyglet_batch and pyglet_group_stars:
@@ -512,15 +528,9 @@ async def pattern_evolution_swarm():
 
     @pyglet_window.event
     def on_draw():
-        logger.debug("on_draw event fired.")
-        try:
-            pyglet_window.clear()
-            pyglet.gl.glClear(pyglet.gl.GL_COLOR_BUFFER_BIT)
-            pyglet_batch.draw()
-            pyglet_fps_display.draw()
-            logger.debug("Frame drawn successfully.")
-        except Exception as e:
-            logger.error(f"Error in on_draw: {e}", exc_info=True)
+        pyglet_window.clear()
+        pyglet_batch.draw()
+        pyglet_fps_display.draw()
 
     @pyglet_window.event
     def on_resize(width, height):
@@ -597,7 +607,8 @@ async def pattern_evolution_swarm():
 
     async def scheduled_update(dt):
         global mandala_overall_rotation_angle, active_stars, active_glyphs
-        logger.debug(f"Scheduled_update - START - dt_received: {dt:.4f}, cycle: {generation_cycle_count}, Active Stars: {len(active_stars)}, Active Glyphs: {len(active_glyphs)}")
+        logger.debug(f"Scheduled_update - START - dt_received: {dt:.4f}, cycle: {generation_cycle_count}")
+        
         if stop_event.is_set():
             logger.info("Stop event received in scheduled_update, closing Pyglet window.")
             if pyglet_window and not pyglet_window.has_exit:
@@ -606,8 +617,8 @@ async def pattern_evolution_swarm():
 
         # Track memory usage
         if torch.cuda.is_available():
-            memory_allocated = torch.cuda.memory_allocated() / 1024**2  # MB
-            memory_reserved = torch.cuda.memory_reserved() / 1024**2    # MB
+            memory_allocated = torch.cuda.memory_allocated() / 1024**2
+            memory_reserved = torch.cuda.memory_reserved() / 1024**2
             logger.info(f"GPU Memory - Allocated: {memory_allocated:.1f}MB, Reserved: {memory_reserved:.1f}MB")
         else:
             process = psutil.Process()
@@ -617,12 +628,12 @@ async def pattern_evolution_swarm():
         mandala_overall_rotation_angle += 0.5
         if mandala_overall_rotation_angle > 360: mandala_overall_rotation_angle -= 360
 
-        # Run pattern evolution in a separate task to prevent blocking
+        # Run pattern evolution in a separate task
         try:
             pattern_task = asyncio.create_task(
                 pattern_evolution_update_cycle(flock_gen, story_tell, vector_vis, semantic_flow_prompts)
             )
-            await asyncio.wait_for(pattern_task, timeout=0.1)  # 100ms timeout
+            await asyncio.wait_for(pattern_task, timeout=0.1)
         except asyncio.TimeoutError:
             logger.warning("Pattern evolution cycle took too long, continuing with visualization")
         except Exception as e:
@@ -631,9 +642,9 @@ async def pattern_evolution_swarm():
         if current_pattern_tensor is not None:
             tensor_mean = current_pattern_tensor.mean().item() if isinstance(current_pattern_tensor, torch.Tensor) else 'N/A'
             tensor_std = current_pattern_tensor.std().item() if isinstance(current_pattern_tensor, torch.Tensor) else 'N/A'
-            logger.debug(f"Scheduled_update - Updating visuals with tensor (mean: {tensor_mean:.4f}, std: {tensor_std:.4f}), Overall Rotation: {mandala_overall_rotation_angle:.2f}")
+            logger.debug(f"Scheduled_update - Updating visuals with tensor (mean: {tensor_mean:.4f}, std: {tensor_std:.4f})")
             
-            # Update visualization in a non-blocking way
+            # Update both visualizations
             try:
                 vector_vis.update_geometric_mandala_pyglet(
                     current_pattern_tensor, pyglet_batch,
@@ -643,8 +654,15 @@ async def pattern_evolution_swarm():
                     mandala_shape_bias=flock_gen.config.mandala_shape_bias,
                     overall_rotation_angle_deg=mandala_overall_rotation_angle
                 )
+                
+                quantum_vis.update_visualization(
+                    current_pattern_tensor, pyglet_batch,
+                    group_foreground=pyglet_group_foreground,
+                    group_background=pyglet_group_background,
+                    window_width=pyglet_window.width, window_height=pyglet_window.height
+                )
             except Exception as e:
-                logger.error(f"Error updating mandala visualization: {e}", exc_info=True)
+                logger.error(f"Error updating visualizations: {e}", exc_info=True)
         
         # Update stars and glyphs with error handling
         try:
