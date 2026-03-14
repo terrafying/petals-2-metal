@@ -4,8 +4,10 @@
   const container = document.getElementById('canvas-container');
   const promptInput = document.getElementById('prompt');
   const runBtn = document.getElementById('run');
+  const maxTokensInput = document.getElementById('max-tokens');
   const layerSlider = document.getElementById('layer-slider');
   const layerRiverCheckbox = document.getElementById('layer-river');
+  const allLayersCheckbox = document.getElementById('all-layers');
   const statusEl = document.getElementById('status');
 
   let scene, camera, renderer, pointsMesh, lineMesh, layerRiverMeshes = [];
@@ -14,7 +16,11 @@
   let streamTokens = [];
   let streamMode = null;
   let ws = null;
+  let rafId = null;
   const SCALE = 2.0;
+  let cameraOrbit = { theta: 0.4, phi: 0.4, radius: 8 };
+  let orbitCenter = { x: 0, y: 0, z: 0 };
+  let updateCameraFromOrbit = null;
 
   function setStatus(text) {
     statusEl.textContent = text;
@@ -38,22 +44,35 @@
       camera.lookAt(0, 0, 0);
 
       renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-      renderer.setSize(window.innerWidth, window.innerHeight);
+      var w = container.clientWidth || window.innerWidth || 800;
+      var h = container.clientHeight || window.innerHeight || 600;
+      if (w <= 0 || h <= 0) {
+        w = 800;
+        h = 600;
+      }
+      renderer.setSize(w, h);
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
       renderer.domElement.style.display = 'block';
       renderer.domElement.style.width = '100%';
       renderer.domElement.style.height = '100%';
       container.appendChild(renderer.domElement);
 
-      var grid = new THREE.GridHelper(8, 8, 0x333333, 0x222222);
+      var grid = new THREE.GridHelper(8, 8, 0x555555, 0x444444);
       grid.position.set(0, 0, 0);
       scene.add(grid);
 
       window.addEventListener('resize', function () {
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
+        var cw = container.clientWidth || window.innerWidth;
+        var ch = container.clientHeight || window.innerHeight;
+        if (cw > 0 && ch > 0) {
+          camera.aspect = cw / ch;
+          camera.updateProjectionMatrix();
+          renderer.setSize(cw, ch);
+        }
       });
+      renderer.render(scene, camera);
       if (placeholder && placeholder.parentNode) placeholder.remove();
     } catch (err) {
       var msg = (err && err.message) ? err.message : String(err);
@@ -68,7 +87,17 @@
     // Simple orbit: mouse drag to rotate, scroll to zoom
     let isDown = false, prevX = 0, prevY = 0;
     const origin = new THREE.Vector3(0, 0, 0);
-    let theta = 0.4, phi = 0.4, radius = 8;
+
+    function updateCamera() {
+      var r = cameraOrbit.radius, th = cameraOrbit.theta, ph = cameraOrbit.phi;
+      var cx = orbitCenter.x, cy = orbitCenter.y, cz = orbitCenter.z;
+      camera.position.x = cx + r * Math.cos(ph) * Math.sin(th);
+      camera.position.y = cy + r * Math.sin(ph);
+      camera.position.z = cz + r * Math.cos(ph) * Math.cos(th);
+      camera.lookAt(cx, cy, cz);
+      camera.updateProjectionMatrix();
+    }
+    updateCameraFromOrbit = updateCamera;
 
     renderer.domElement.addEventListener('mousedown', function (e) {
       if (e.button === 0) { isDown = true; prevX = e.clientX; prevY = e.clientY; }
@@ -77,26 +106,65 @@
     renderer.domElement.addEventListener('mouseleave', function () { isDown = false; });
     renderer.domElement.addEventListener('mousemove', function (e) {
       if (!isDown) return;
-      theta += (e.clientX - prevX) * 0.005;
-      phi += (e.clientY - prevY) * 0.005;
-      phi = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, phi));
+      cameraOrbit.theta += (e.clientX - prevX) * 0.005;
+      cameraOrbit.phi += (e.clientY - prevY) * 0.005;
+      cameraOrbit.phi = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, cameraOrbit.phi));
       prevX = e.clientX;
       prevY = e.clientY;
       updateCamera();
     });
     renderer.domElement.addEventListener('wheel', function (e) {
       e.preventDefault();
-      radius = Math.max(2, Math.min(40, radius + e.deltaY * 0.05));
+      cameraOrbit.radius = Math.max(2, Math.min(80, cameraOrbit.radius + e.deltaY * 0.05));
       updateCamera();
     }, { passive: false });
+  }
 
-    function updateCamera() {
-      camera.position.x = radius * Math.cos(phi) * Math.sin(theta);
-      camera.position.y = radius * Math.sin(phi);
-      camera.position.z = radius * Math.cos(phi) * Math.cos(theta);
-      camera.lookAt(origin);
-      camera.updateProjectionMatrix();
+  function boundingSphereFromPoints(points) {
+    if (!points || points.length === 0) return null;
+    var minx = Infinity, miny = Infinity, minz = Infinity;
+    var maxx = -Infinity, maxy = -Infinity, maxz = -Infinity;
+    for (var i = 0; i < points.length; i++) {
+      var p = points[i];
+      var x = (p[0] || 0) * SCALE, y = (p[1] || 0) * SCALE, z = (p[2] || 0) * SCALE;
+      if (x < minx) minx = x; if (x > maxx) maxx = x;
+      if (y < miny) miny = y; if (y > maxy) maxy = y;
+      if (z < minz) minz = z; if (z > maxz) maxz = z;
     }
+    var cx = (minx + maxx) / 2, cy = (miny + maxy) / 2, cz = (minz + maxz) / 2;
+    var r = 0;
+    for (var j = 0; j < points.length; j++) {
+      var q = points[j];
+      var dx = (q[0] || 0) * SCALE - cx, dy = (q[1] || 0) * SCALE - cy, dz = (q[2] || 0) * SCALE - cz;
+      var d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      if (d > r) r = d;
+    }
+    if (r < 0.5) r = 2;
+    return { center: new THREE.Vector3(cx, cy, cz), radius: r };
+  }
+
+  function fitCameraToContent(pointsOrLayers) {
+    if (!camera || !updateCameraFromOrbit) return;
+    var points = [];
+    if (Array.isArray(pointsOrLayers) && pointsOrLayers.length > 0) {
+      if (Array.isArray(pointsOrLayers[0]) && pointsOrLayers[0].length > 0 && typeof pointsOrLayers[0][0] === 'object') {
+        for (var L = 0; L < pointsOrLayers.length; L++)
+          for (var k = 0; k < (pointsOrLayers[L] || []).length; k++) points.push(pointsOrLayers[L][k]);
+      } else {
+        points = pointsOrLayers;
+      }
+    }
+    var sphere = boundingSphereFromPoints(points);
+    if (!sphere) return;
+    var dist = sphere.radius * 2.2;
+    orbitCenter.x = sphere.center.x; orbitCenter.y = sphere.center.y; orbitCenter.z = sphere.center.z;
+    camera.position.copy(sphere.center).add(new THREE.Vector3(1, 0.5, 1).normalize().multiplyScalar(dist));
+    camera.lookAt(sphere.center);
+    camera.updateProjectionMatrix();
+    cameraOrbit.radius = dist;
+    var pos = camera.position;
+    cameraOrbit.theta = Math.atan2(pos.x - sphere.center.x, pos.z - sphere.center.z);
+    cameraOrbit.phi = Math.asin((pos.y - sphere.center.y) / dist);
   }
 
   function updateStreamGeometry(points) {
@@ -280,18 +348,21 @@
       if (msg.cmd === 'stream_end') {
         setStatus('Done: ' + streamPoints.length + ' points (mode: ' + (msg.mode || streamMode) + ')');
         streamMode = null;
+        fitCameraToContent(streamPoints);
         return;
       }
       if (msg.cmd === 'states') {
         streamPoints = [];
         streamTokens = [];
         currentData = { layers: msg.layers || [], tokens: msg.tokens || [], mode: msg.mode || 'mock' };
-        setStatus('Loaded ' + (currentData.layers[0]?.length || 0) + ' points (mode: ' + currentData.mode + ')');
-        if (layerRiverCheckbox && layerRiverCheckbox.checked && currentData.layers.length >= 2) {
+        setStatus('Loaded ' + (currentData.layers[0]?.length || 0) + ' points, ' + (currentData.layers.length || 0) + ' layers (mode: ' + currentData.mode + ')');
+        if (currentData.layers.length >= 2) {
+          if (layerRiverCheckbox) layerRiverCheckbox.checked = true;
           showLayerRiver();
         } else {
           showLayer(parseInt(layerSlider.value, 10));
         }
+        fitCameraToContent(currentData.layers);
         return;
       }
       if (msg.cmd === 'error') {
@@ -302,20 +373,22 @@
 
   function run() {
     const prompt = promptInput.value.trim() || 'Hello, world.';
-    setStatus('Sending prompt…');
+    const maxTokens = Math.max(8, Math.min(256, parseInt(maxTokensInput && maxTokensInput.value, 10) || 96));
+    const stream = !(allLayersCheckbox && allLayersCheckbox.checked);
+    setStatus(stream ? 'Sending prompt (stream)…' : 'Sending prompt (all layers)…');
     if (!ws || ws.readyState !== WebSocket.OPEN) {
       setStatus('Reconnecting…');
       connect();
       setTimeout(function () {
         if (ws && ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ cmd: 'prompt', prompt: prompt, max_tokens: 48 }));
+          ws.send(JSON.stringify({ cmd: 'prompt', prompt: prompt, max_tokens: maxTokens, stream: stream }));
         } else {
           setStatus('Not connected. Start the server (uvicorn viz_server:app).');
         }
       }, 500);
       return;
     }
-    ws.send(JSON.stringify({ cmd: 'prompt', prompt: prompt, max_tokens: 48 }));
+    ws.send(JSON.stringify({ cmd: 'prompt', prompt: prompt, max_tokens: maxTokens, stream: stream }));
   }
 
   function animate() {
@@ -344,7 +417,14 @@
     });
   }
 
-  initThree();
-  connect();
-  animate();
+  function start() {
+    initThree();
+    connect();
+    animate();
+  }
+  if (document.readyState === 'complete') {
+    start();
+  } else {
+    window.addEventListener('load', start);
+  }
 })();

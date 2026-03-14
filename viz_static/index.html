@@ -97,6 +97,8 @@
   <div id="ui">
     <input id="prompt" type="text" placeholder="Enter a prompt to visualize internal state…" value="The meaning of life is" />
     <button id="run" class="primary">Run</button>
+    <label for="max-tokens">Tokens</label>
+    <input id="max-tokens" type="number" min="8" max="256" value="96" style="width:56px;padding:8px;background:#1a1a1c;border:1px solid #333;border-radius:8px;color:#e0e0e0;" />
     <div id="layer-slider-wrap">
       <label for="layer-slider">Layer</label>
       <input id="layer-slider" type="range" min="0" max="0" value="0" />
@@ -104,6 +106,7 @@
     <div id="layer-river-wrap">
       <label><input type="checkbox" id="layer-river" /> Layer river</label>
     </div>
+    <label><input type="checkbox" id="all-layers" /> All layers</label>
     <span id="status">Idle. Enter prompt and click Run.</span>
   </div>
   <div id="hint">Drag to rotate · Scroll to zoom</div>

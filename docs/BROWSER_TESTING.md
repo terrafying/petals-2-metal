@@ -22,17 +22,19 @@ The test will:
 1. Start `viz_server` on a free port (or use `VIZ_SERVER_PORT` if set).
 2. Open Chromium (headless), go to the viz page.
 3. Wait for the canvas, take **screenshot_after_load.png**.
-4. Click **Run**, wait until status shows "Done" or "points", take **screenshot_after_run.png**.
+4. Click **Run**, wait until status shows "Done" or "points", take **screenshot_after_run.png** and **screenshot_canvas_after_run.png** (canvas only).
 5. Collect all console messages and write **console.log**.
 6. Assert there are no console errors.
+7. Assert the canvas has at least 500 non-background pixels (grid + points visible), so we can debug "does the viz show anything?" separately from your local browser.
 
 Artifacts are written to:
 
 ```
 .browser-test-artifacts/
-  screenshot_after_load.png   # Page right after load (grid visible)
-  screenshot_after_run.png    # After Run, trajectory visible
-  console.log                 # All [log]/[error]/[warn] messages
+  screenshot_after_load.png      # Page right after load (grid visible)
+  screenshot_after_run.png       # After Run, trajectory visible
+  screenshot_canvas_after_run.png # Canvas only (used for pixel assertion)
+  console.log                    # All [log]/[error]/[warn] messages
   # On failure only:
   screenshot_on_failure.png   # Page at moment of failure
   failure-trace.zip           # Playwright trace (playwright show-trace failure-trace.zip)
