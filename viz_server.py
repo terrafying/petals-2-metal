@@ -269,7 +269,7 @@ app = FastAPI(title="LLM State Viz", description="Stream LLM internal state to W
 async def index():
     path = os.path.join(STATIC_DIR, "index.html")
     if os.path.isfile(path):
-        return FileResponse(path)
+        return FileResponse(path, media_type="text/html")
     return HTMLResponse("<p>LLM State Viz. Put index.html in viz_static/.</p>")
 
 

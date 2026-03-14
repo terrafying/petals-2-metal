@@ -21,22 +21,49 @@
   }
 
   function initThree() {
-    scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0d0d0f);
-    camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(4, 2, 6);
-    camera.lookAt(0, 0, 0);
+    var placeholder = document.getElementById('canvas-placeholder');
+    if (typeof THREE === 'undefined') {
+      setStatus('Error: Three.js did not load. Check the console or try another network.');
+      if (placeholder) placeholder.textContent = 'Three.js failed to load (check Network tab for cdnjs).';
+      return;
+    }
+    try {
+      if (placeholder) placeholder.remove();
+    } catch (e) { /* ignore */ }
+    try {
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x0d0d0f);
+      camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+      camera.position.set(4, 2, 6);
+      camera.lookAt(0, 0, 0);
 
-    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    container.appendChild(renderer.domElement);
-
-    window.addEventListener('resize', function () {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
       renderer.setSize(window.innerWidth, window.innerHeight);
-    });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.domElement.style.display = 'block';
+      renderer.domElement.style.width = '100%';
+      renderer.domElement.style.height = '100%';
+      container.appendChild(renderer.domElement);
+
+      var grid = new THREE.GridHelper(8, 8, 0x333333, 0x222222);
+      grid.position.set(0, 0, 0);
+      scene.add(grid);
+
+      window.addEventListener('resize', function () {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+      if (placeholder && placeholder.parentNode) placeholder.remove();
+    } catch (err) {
+      var msg = (err && err.message) ? err.message : String(err);
+      setStatus('Error: ' + msg);
+      if (placeholder) {
+        placeholder.textContent = 'Canvas error: ' + msg;
+        placeholder.style.color = '#c55';
+      }
+      return;
+    }
 
     // Simple orbit: mouse drag to rotate, scroll to zoom
     let isDown = false, prevX = 0, prevY = 0;
@@ -73,6 +100,7 @@
   }
 
   function updateStreamGeometry(points) {
+    if (!scene) return;
     if (pointsMesh) {
       scene.remove(pointsMesh);
       pointsMesh.geometry.dispose();
@@ -166,6 +194,7 @@
   }
 
   function showLayerRiver() {
+    if (!scene) return;
     if (pointsMesh) { scene.remove(pointsMesh); pointsMesh.geometry.dispose(); pointsMesh.material.dispose(); pointsMesh = null; }
     if (lineMesh) { scene.remove(lineMesh); lineMesh.geometry.dispose(); lineMesh.material.dispose(); lineMesh = null; }
     clearRiverMeshes();
@@ -197,6 +226,7 @@
   }
 
   function showLayer(layerIndex) {
+    if (!scene) return;
     clearRiverMeshes();
     if (pointsMesh) { scene.remove(pointsMesh); pointsMesh.geometry.dispose(); pointsMesh.material.dispose(); }
     if (lineMesh) { scene.remove(lineMesh); lineMesh.geometry.dispose(); lineMesh.material.dispose(); lineMesh = null; }
@@ -290,7 +320,9 @@
 
   function animate() {
     rafId = requestAnimationFrame(animate);
-    renderer.render(scene, camera);
+    if (renderer && scene && camera) {
+      renderer.render(scene, camera);
+    }
   }
 
   runBtn.addEventListener('click', run);
